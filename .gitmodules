@@ -1,0 +1,3 @@
+[submodule "ext/e-Paper"]
+	path = ext/e-Paper
+	url = https://github.com/waveshare/e-Paper

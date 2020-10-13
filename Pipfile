@@ -1,0 +1,21 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+black = "*"
+isort = "*"
+flake8 = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-asyncio = "*"
+
+[packages]
+waveshare-epd = {editable = true, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
+
+[requires]
+python_version = "3.8"
+
+[pipenv]
+allow_prereleases = true
