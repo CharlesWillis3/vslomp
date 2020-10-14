@@ -13,6 +13,10 @@ pytest-asyncio = "*"
 
 [packages]
 waveshare-epd = {editable = true, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
+spidev = "*"
+"rpi.gpio" = "*"
+setuptools = "*"
+cmdq = {editable = true, path = "./cmdq"}
 
 [requires]
 python_version = "3.8"

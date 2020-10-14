@@ -9,4 +9,6 @@ use_parentheses=true
 line_length=99
 
 [tool.pytest.ini_options]
-testpaths=["vslomp_test"]
+testpaths=["test"]
+log_cli = 1
+log_cli_level = "INFO"

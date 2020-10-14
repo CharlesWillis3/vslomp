@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8865f0b5c40374210fc453688c2c97d7a9d7f2ad9e4564ec85205513d039726f"
+            "sha256": "f2ab2ec1a2991e5ba16d416674614bb06396998df73039c713845cc4a5c72e53"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,6 +16,24 @@
         ]
     },
     "default": {
+        "cmdq": {
+            "editable": true,
+            "path": "./cmdq"
+        },
+        "rpi.gpio": {
+            "hashes": [
+                "sha256:7424bc6c205466764f30f666c18187a0824077daf20b295c42f08aea2cb87d3f"
+            ],
+            "index": "pypi",
+            "version": "==0.7.0"
+        },
+        "spidev": {
+            "hashes": [
+                "sha256:8a7f5c289f161ea2ac4697fa8a10918232c990678dd0053084b3c43b1363910d"
+            ],
+            "index": "pypi",
+            "version": "==3.5"
+        },
         "waveshare-epd": {
             "editable": true,
             "path": "./ext/e-Paper/RaspberryPi&JetsonNano/python"
@@ -109,11 +127,11 @@
         },
         "isort": {
             "hashes": [
-                "sha256:2c1d044a96c74367ab12188593d134c596747d97aec43b9cdb12eea83b6889d2",
-                "sha256:3820dd92c3214290cda6351f2ae2cedd5170759bc434af600eaad4f7a82a6ade"
+                "sha256:dcab1d98b469a12a1a624ead220584391648790275560e1a43e54c5dceae65e7",
+                "sha256:dcaeec1b5f0eca77faea2a35ab790b4f3680ff75590bfcb7145986905aab2f58"
             ],
             "index": "pypi",
-            "version": "==5.6.3"
+            "version": "==5.6.4"
         },
         "mccabe": {
             "hashes": [
