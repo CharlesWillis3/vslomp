@@ -10,7 +10,10 @@
     "python.analysis.extraPaths": [
         "vslomp"
     ],
-    "python.testing.cwd": "~/dev/vslomp/vslomp",
+    "python.testing.cwd": "~/dev/vslomp",
     "terminal.integrated.inheritEnv": false,
-    "python.terminal.activateEnvironment": false
+    "python.terminal.activateEnvironment": false,
+    "python.testing.pytestArgs": [
+        "vslomp"
+    ]
 }

@@ -17,6 +17,7 @@ spidev = "*"
 "rpi.gpio" = "*"
 setuptools = "*"
 cmdq = {editable = true, path = "./cmdq"}
+pillow = "*"
 
 [requires]
 python_version = "3.8"

@@ -1,24 +1,31 @@
 from __future__ import annotations
 
 import asyncio
+from asyncio.exceptions import CancelledError
 from asyncio.queues import PriorityQueue
 from operator import __lt__
 from typing import Any, Awaitable, Callable, Generic, Optional, Tuple, TypeVar
 
-from asyncio.exceptions import CancelledError
 
-
-class Error(Exception):
+class CmdProcError(Exception):
     pass
 
-class ConfigureWhileRunningError(Error):
+
+class ConfigureWhileRunningError(CmdProcError):
     pass
 
-class ResultCallbackError(Error):
+
+class ResultCallbackError(CmdProcError):
     pass
 
-class UnknownCmdError(Error):
+
+class UnknownCmdError(CmdProcError):
     pass
+
+
+class InvalidDataError(CmdProcError):
+    pass
+
 
 TCmd = TypeVar("TCmd")
 
@@ -31,9 +38,12 @@ class MsgHandle(Generic[TCmd]):
     def __lt__(self, ls: MsgHandle[TCmd]) -> bool:
         return self.pri < ls.pri
 
+    def __str__(self) -> str:
+        return f"cmd={self.cmd} pri={self.pri}"
+
 
 class CmdProc(Generic[TCmd]):
-    ResultCallback = Callable[[MsgHandle[TCmd], Optional[Any]], None]
+    ResultCallback = Callable[[MsgHandle[TCmd], Optional[Any]], Awaitable[Optional[Any]]]
     ErrorCallback = Callable[[MsgHandle[TCmd], Exception], None]
 
     def __init__(
@@ -66,19 +76,22 @@ class CmdProc(Generic[TCmd]):
         async with self.__isrunning_lock:
             self.__isrunning = False
 
-    async def send(self, cmd: TCmd, data: Optional[Any] = None, pri: int = 50) -> MsgHandle[TCmd]:
-        h = MsgHandle(cmd, pri)
-        await self._q.put((h, data))
-        return h
-
-    async def join(self) -> None:
-        await self._q.join()
+    async def cancel(self):
         self._consume_task.cancel()
 
         try:
             await self._consume_task
         except CancelledError:
             pass
+
+    async def send(self, cmd: TCmd, data: Optional[Any] = None, pri: int = 50) -> MsgHandle[TCmd]:
+        h = MsgHandle(cmd, pri)
+        await self._q.put((h, data))
+        print("RCVD", h, data)
+        return h
+
+    async def join(self):
+        await self._q.join()
 
     def _handle_msg(self, cmd: TCmd, data: Optional[Any]) -> Awaitable[Optional[Any]]:
         raise NotImplementedError()
@@ -87,20 +100,21 @@ class CmdProc(Generic[TCmd]):
         async with self.__isrunning_lock:
             return self.__isrunning
 
-    async def __consume(self) -> None:
+    async def __consume(self):
         while True:
             if await self.__is_running():
                 hmsg, data = await self._q.get()
                 try:
+                    print("START", hmsg)
                     result = await self._handle_msg(hmsg.cmd, data)
                     if callable(self._onresult):
                         try:
-                            self._onresult(hmsg, result)
+                            await self._onresult(hmsg, result)
                         except Exception as oresex:
                             raise ResultCallbackError(oresex)
                 except Exception as ex:
                     if callable(self._onerror):
-                        self._onerror(hmsg, Error(ex))
+                        self._onerror(hmsg, CmdProcError(ex))
                     else:
                         raise
                 finally:
