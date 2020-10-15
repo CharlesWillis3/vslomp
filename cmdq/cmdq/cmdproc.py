@@ -31,9 +31,11 @@ TCmd = TypeVar("TCmd")
 
 
 class MsgHandle(Generic[TCmd]):
-    def __init__(self, cmd: TCmd, pri: int):
+    def __init__(self, cmd: TCmd, pri: int, thread: bool, *tags: Any):
         self.cmd = cmd
         self.pri = pri
+        self.thread = thread
+        self.tags = tags
 
     def __lt__(self, ls: MsgHandle[TCmd]) -> bool:
         return self.pri < ls.pri
@@ -84,8 +86,8 @@ class CmdProc(Generic[TCmd]):
         except CancelledError:
             pass
 
-    async def send(self, cmd: TCmd, data: Optional[Any] = None, pri: int = 50) -> MsgHandle[TCmd]:
-        h = MsgHandle(cmd, pri)
+    async def send(self, cmd: TCmd, data: Optional[Any] = None, pri: int = 50, thread: bool = False, *tags: Any) -> MsgHandle[TCmd]:
+        h = MsgHandle(cmd, pri, thread, tags)
         await self._q.put((h, data))
         print("RCVD", h, data)
         return h
@@ -101,17 +103,24 @@ class CmdProc(Generic[TCmd]):
             return self.__isrunning
 
     async def __consume(self):
+        async def _exec_cb(_hmsg: MsgHandle[TCmd], _result: Optional[Any]):
+            if callable(self._onresult):
+                try:
+                    await self._onresult(_hmsg, _result)
+                except Exception as oresex:
+                    raise ResultCallbackError(oresex)
+
         while True:
             if await self.__is_running():
                 hmsg, data = await self._q.get()
                 try:
                     print("START", hmsg)
-                    result = await self._handle_msg(hmsg.cmd, data)
-                    if callable(self._onresult):
-                        try:
-                            await self._onresult(hmsg, result)
-                        except Exception as oresex:
-                            raise ResultCallbackError(oresex)
+                    if hmsg.thread:
+                        result_fut = asyncio.run_coroutine_threadsafe(self._handle_msg(hmsg.cmd, data), asyncio.new_event_loop())
+                        result_fut.add_done_callback(lambda _fut: _exec_cb(hmsg, _fut.result()))
+                    else:
+                        result = await self._handle_msg(hmsg.cmd, data)
+                        await _exec_cb(hmsg, result)
                 except Exception as ex:
                     if callable(self._onerror):
                         self._onerror(hmsg, CmdProcError(ex))

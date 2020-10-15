@@ -9,9 +9,11 @@ from .handlers._imager import (
     cmd_convert,
     cmd_load_file,
     cmd_get_demo,
+    cmd_ensure_size,
     DataType,
     ReturnType,
-    ConvertData, # type:ignore
+    ConvertData,
+    EnsureSizeData,
 )
 
 
@@ -24,11 +26,15 @@ def _raise_unknown(cmd: Any) -> Callable[[DataType], ReturnType]:
 
     return _inner
 
+class ImagerCmdData:
+    convert = ConvertData
+    ensure_size = EnsureSizeData
 
 class ImagerCmd(Enum):
     LOAD_FILE = auto()  # str -> Image
     CONVERT = auto()  # ConvertData -> Image
-    GET_DEMO = auto()
+    GET_DEMO = auto() # -> Image
+    ENSURE_SIZE = auto() # EnsureSizeData -> Image
 
 
 class ImagerCmdProc(CmdProc[ImagerCmd]):
@@ -36,6 +42,7 @@ class ImagerCmdProc(CmdProc[ImagerCmd]):
         ImagerCmd.LOAD_FILE: cmd_load_file,
         ImagerCmd.CONVERT: cmd_convert,
         ImagerCmd.GET_DEMO: cmd_get_demo,
+        ImagerCmd.ENSURE_SIZE: cmd_ensure_size
     }
 
     async def _handle_msg(self, cmd: ImagerCmd, data: DataType) -> ReturnType:
