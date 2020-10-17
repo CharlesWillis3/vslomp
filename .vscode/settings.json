@@ -13,5 +13,5 @@
     "python.testing.cwd": "~/dev/vslomp",
     "terminal.integrated.inheritEnv": false,
     "python.terminal.activateEnvironment": false,
-    "python.testing.pytestArgs": []
+    "python.testing.pytestArgs": [],
 }

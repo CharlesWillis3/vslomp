@@ -12,12 +12,14 @@ class ScreenCmd(ABC):
     def __call__(self, epd: EPD) -> None:
         raise UnknownCmdError
 
+
 class Wait(ScreenCmd):
     def __init__(self, secs: float) -> None:
         self.secs = secs
-        
+
     def __call__(self, epd: EPD) -> None:
         time.sleep(self.secs)
+
 
 class Init(ScreenCmd):
     def __call__(self, epd: EPD) -> None:
@@ -45,3 +47,8 @@ class Display(ScreenCmd):
 
     def __call__(self, epd: EPD) -> None:
         epd.display(epd.getbuffer(self.img))  # type:ignore
+
+
+class Terminate(ScreenCmd):
+    def __call__(self, epd: EPD) -> None:
+        pass

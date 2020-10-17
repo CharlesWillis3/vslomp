@@ -1,0 +1,23 @@
+{
+    "include": [
+      "vslomp"
+    ],
+    
+    "exclude": [
+      "**/node_modules",
+      "**/__pycache__",
+      "src/experimental",
+      "src/typestubs"
+    ],
+  
+    "ignore": [
+    ],
+  
+    "stubPath": "typings",
+  
+    "reportMissingImports": true,
+    "reportMissingTypeStubs": false,
+  
+    "pythonVersion": "3.8",
+    "pythonPlatform": "Linux"
+}

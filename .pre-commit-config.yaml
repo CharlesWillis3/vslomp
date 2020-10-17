@@ -15,6 +15,12 @@ repos:
         entry: pipenv run black
         types: [python]
 
+      - id: pyright
+        name: pyright
+        stages: [commit]
+        language: system
+        entry: pipenv run node node_modules/pyright --lib -p pyrightconfig.json --stats
+
       - id: flake8
         name: flake8
         stages: [commit]
@@ -23,17 +29,17 @@ repos:
         types: [python]
         exclude: setup.py
 
-      - id: pytest
-        name: pytest
-        stages: [commit]
-        language: system
-        entry: pipenv run python -m pytest
-        types: [python]
+      # - id: pytest
+      #   name: pytest
+      #   stages: [commit]
+      #   language: system
+      #   entry: pipenv run python -m pytest
+      #   types: [python]
 
-      - id: pytest-cov
-        name: pytest
-        stages: [push]
-        language: system
-        entry: pipenv run python -m pytest --cov --cov-fail-under=100
-        types: [python]
-        pass_filenames: false
+      # - id: pytest-cov
+      #   name: pytest
+      #   stages: [push]
+      #   language: system
+      #   entry: pipenv run python -m pytest --cov --cov-fail-under=80
+      #   types: [python]
+      #   pass_filenames: false

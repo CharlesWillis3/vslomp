@@ -10,9 +10,11 @@ flake8 = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-asyncio = "*"
+nodeenv = "*"
+pre-commit = "*"
 
 [packages]
-waveshare-epd = {editable = true, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
+waveshare-epd = {editable = false, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
 spidev = "*"
 "rpi.gpio" = "*"
 setuptools = "*"
