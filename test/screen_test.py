@@ -1,8 +1,8 @@
 import logging
-from cmdq.cmdproc import CmdProcError # type:ignore
 
 import pytest
 
+from cmdq.cmdproc import CmdProcError  # type:ignore
 from vslomp.display.screen import *
 
 LOG = logging.getLogger(__name__)

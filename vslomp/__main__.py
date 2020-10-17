@@ -1,57 +1,59 @@
 import asyncio
 from typing import Any, Optional
-from PIL.Image import Image, FLOYDSTEINBERG
 
-from cmdq.cmdproc import MsgHandle  # type:ignore
+from PIL.Image import FLOYDSTEINBERG, Image
 
-from vslomp.display.screen import ScreenCmd, ScreenCmdProc
-from vslomp.display.imager import ImagerCmd, ImagerCmdProc, ImagerCmdData
+import vslomp.display.imager.cmds as imager
+import vslomp.display.imager.proc as imager_proc
+import vslomp.display.screen.cmds as screen
+import vslomp.display.screen.proc as screen_proc
+from cmdq.cmdproc import CmdHandle
 
 
-async def main():
+def main():
+    print("Running VsloMP")
+    scp = screen_proc.CmdProc()
+    icp = imager_proc.CmdProc()
 
-    print("Running vSLOmp")
-    scp = ScreenCmdProc()
-    icp = ImagerCmdProc()
+    def error_handler(hcmd: CmdHandle[Any], ex: Exception):
+        print("ERROR", hcmd, str(ex.args))
 
-    def error_handler(hmsg: MsgHandle[Any], ex: Exception):
-        print("ERROR", hmsg, str(ex.args))
-
-    async def icp_handler(hmsg: MsgHandle[ImagerCmd], img: Optional[Any]):
-        print("DONE",hmsg)
+    def icp_handler(hcmd: CmdHandle[imager.ImagerCmd], img: Optional[Any]):
         if isinstance(img, Image):
-            if hmsg.cmd == ImagerCmd.LOAD_FILE:
-                data = ImagerCmdData.ensure_size(img, (800, 480), 0)
-                await icp.send(ImagerCmd.ENSURE_SIZE, data)
-            elif hmsg.cmd == ImagerCmd.ENSURE_SIZE:
-                data = ImagerCmdData.convert(img, "1", FLOYDSTEINBERG)
-                await icp.send(ImagerCmd.CONVERT, data)
+            if hcmd.tcmd == imager.LoadFile:
+                cmd = imager.EnsureSize(img, (800, 480), 0)
+                icp.send(cmd)
+            elif hcmd.tcmd == imager.EnsureSize:
+                cmd = imager.Convert(img, "1", FLOYDSTEINBERG)
+                icp.send(cmd)
             else:
-                await scp.send(ScreenCmd.DISPLAY, img)
+                scp.send(screen.Display(img))
         else:
             raise ValueError(type(img))
 
-    async def scp_handler(hmsg: MsgHandle[ScreenCmd], res: Optional[Any]):
-        print("DONE", hmsg)
-        if hmsg.cmd == ScreenCmd.DISPLAY:
-            await asyncio.sleep(2)
-            await scp.send(ScreenCmd.CLEAR, pri=100)
-            await scp.send(ScreenCmd.SLEEP, pri=200)
-            await scp.send(ScreenCmd.UNINIT, pri=250)
+    def scp_handler(hcmd: CmdHandle[screen.ScreenCmd], res: Optional[Any]):
+        if hcmd.tcmd == screen.Display:
+            scp.send(screen.Wait(10))
+            scp.send(screen.Clear, pri=100)
+            scp.send(screen.Sleep, pri=200)
+            scp.send(screen.Uninit, pri=250)
 
-    await scp.on_error(error_handler)
-    await icp.on_error(error_handler)
-    await scp.on_result(scp_handler)
-    await icp.on_result(icp_handler)
+    scp.on_error(error_handler).on_result(scp_handler)
+    icp.on_error(error_handler).on_result(icp_handler)
 
-    await scp.start()
-    await icp.start()
+    scp.start()
+    icp.start()
 
-    await scp.send(ScreenCmd.INIT)
-    await scp.send(ScreenCmd.CLEAR)
-    await icp.send(ImagerCmd.LOAD_FILE, "/home/pi/images/001.jpg")
+    scp.send(screen.Init)
+    scp.send(screen.Clear)
+    icp.send(imager.LoadFile("/home/pi/images/001.jpg"))
 
-    await asyncio.gather(scp.join(), icp.join())
+    icp.join()
+    scp.join()
 
+    del(icp)
+    del(scp)
 
-asyncio.run(main())
+    return None
+
+main()
