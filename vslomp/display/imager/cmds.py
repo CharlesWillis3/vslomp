@@ -21,7 +21,9 @@ class LoadFile(ImagerCmd):
 
 
 class Convert(ImagerCmd):
-    def __init__(self, img: Image.Image, mode: Optional[str], dither: int = Image.FLOYDSTEINBERG) -> None:
+    def __init__(
+        self, img: Image.Image, mode: Optional[str], dither: int = Image.FLOYDSTEINBERG
+    ) -> None:
         self.img = img
         self.mode = mode
         self.dither = dither
@@ -35,7 +37,7 @@ class EnsureSize(ImagerCmd):
         self.img = img
         self.size = size
         self.fill = fill
-    
+
     def __call__(self) -> Image.Image:
         img = self.img
         img.thumbnail(self.size, resample=Image.ANTIALIAS)

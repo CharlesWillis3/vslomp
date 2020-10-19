@@ -16,11 +16,11 @@ async def test_screen_init():
     error_handles = []
 
     async def append_result(h, res):  # type:ignore
-        result_handles.append(h) # type:ignore
+        result_handles.append(h)  # type:ignore
 
     s = ScreenCmdProc()
     await s.on_error(lambda h, ex: error_handles.append(h))
-    await s.on_result(append_result) # type:ignore
+    await s.on_result(append_result)  # type:ignore
     LOG.info("starting")
     await s.start()
     LOG.info("sending INIT")
@@ -37,8 +37,9 @@ async def test_screen_init():
     assert s3 in result_handles
     assert len(error_handles) == 0
     LOG.info("returning")
-    
+
     asyncio.get_running_loop().stop()
+
 
 @pytest.mark.asyncio
 async def test_screen_display_data():
@@ -46,11 +47,11 @@ async def test_screen_display_data():
     errors = []
 
     async def append_result(h, res):  # type:ignore
-        results.append((h, res)) # type:ignore
+        results.append((h, res))  # type:ignore
 
     s = ScreenCmdProc()
     await s.on_error(lambda h, ex: errors.append((h, ex)))
-    await s.on_result(append_result) # type:ignore
+    await s.on_result(append_result)  # type:ignore
     await s.start()
     msgh = await s.send(ScreenCmd.DISPLAY, None)
     await s.join()
@@ -60,4 +61,5 @@ async def test_screen_display_data():
     assert isinstance(rex, CmdProcError)
 
     import asyncio
+
     asyncio.get_running_loop().stop()

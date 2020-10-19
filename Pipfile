@@ -18,11 +18,15 @@ waveshare-epd = {editable = false, path = "./ext/e-Paper/RaspberryPi&JetsonNano/
 spidev = "*"
 "rpi.gpio" = "*"
 setuptools = "*"
-cmdq = {editable = true, path = "./cmdq"}
+cmdq = {editable = true, path = "./lib/cmdq"}
 pillow = "*"
+av = "*"
 
 [requires]
 python_version = "3.8"
 
 [pipenv]
 allow_prereleases = true
+
+[scripts]
+pyright = "node node_modules/pyright"
