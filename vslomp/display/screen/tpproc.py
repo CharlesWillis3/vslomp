@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import enum
 from time import sleep
 from cmdq.base import Command, CommandHandle, CommandProcessor
@@ -5,7 +6,7 @@ from waveshare_epd.epd7in5_V2 import EPD
 from PIL.Image import Image
 from cmdq.processors.threadpool import CmdProcessor, ProcHandle
 
-class ScreenCommand(enum.Enum):
+class CommandId(enum.Enum):
     INIT = enum.auto()
     CLEAR = enum.auto()
     DISPLAY = enum.auto()
@@ -13,23 +14,30 @@ class ScreenCommand(enum.Enum):
     SLEEP = enum.auto()
     UNINIT = enum.auto()
 
-class _ScreenCommand(Command[ScreenCommand, EPD, None]):
-    pass
+ScreenCommandHandle = CommandHandle[CommandId]
+ScreenProcessor = CmdProcessor[CommandId, EPD]
+
+class ScreenProcHandle(ProcHandle[CommandId, EPD]):
+    @classmethod
+    def factory(cls, cxt: EPD) -> CommandProcessor[CommandId, EPD]:
+        return ScreenProcessor("Screen", cxt)
+
+_ScreenCommand = Command[CommandId, EPD, None]
 
 class InitCmd(_ScreenCommand):
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.INIT
+    def cmd(self) -> CommandId:
+        return CommandId.INIT
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
         cxt.init()
 
 class ClearCmd(_ScreenCommand):
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.CLEAR
+    def cmd(self) -> CommandId:
+        return CommandId.CLEAR
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
         cxt.Clear()
 
 class DisplayCmd(_ScreenCommand):
@@ -37,43 +45,35 @@ class DisplayCmd(_ScreenCommand):
         self.img = img
 
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.DISPLAY
+    def cmd(self) -> CommandId:
+        return CommandId.DISPLAY
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
-        cxt.display(cxt.getbuffer(self.img)) # 
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
+        cxt.display(cxt.getbuffer(self.img))
 
+@dataclass
 class WaitCmd(_ScreenCommand):
-    def __init__(self, wait: float) -> None:
-        self.wait = wait
+    wait: float
 
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.WAIT
+    def cmd(self) -> CommandId:
+        return CommandId.WAIT
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
         sleep(self.wait)
 
 class SleepCmd(_ScreenCommand):
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.SLEEP
+    def cmd(self) -> CommandId:
+        return CommandId.SLEEP
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
         cxt.sleep()
 
 class UninitCmd(_ScreenCommand):
     @property
-    def cmd(self) -> ScreenCommand:
-        return ScreenCommand.UNINIT
+    def cmd(self) -> CommandId:
+        return CommandId.UNINIT
 
-    def exec(self, hcmd: CommandHandle[ScreenCommand], cxt: EPD) -> None:
+    def exec(self, hcmd: CommandHandle[CommandId], cxt: EPD) -> None:
         cxt.Dev_exit()
-
-class ScreenProcessor(CmdProcessor[ScreenCommand, EPD]):
-    pass
-
-class ScreenProcessorHandle(ProcHandle[ScreenCommand, EPD]):
-    @classmethod
-    def factory(cls, cxt: EPD) -> CommandProcessor[ScreenCommand, EPD]:
-        return ScreenProcessor(cxt)
