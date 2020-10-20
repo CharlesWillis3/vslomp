@@ -1,16 +1,15 @@
-# type:ignore
-
 import itertools
 import logging
+from typing import Any, Container
 
 import av
 import av.datasets
 from PIL.Image import FLOYDSTEINBERG, Image
-
-import vslomp.display.screen.tpproc as screen
-import vslomp.display.imager.tpproc as imager
-
 from waveshare_epd.epd7in5_V2 import EPD
+
+import vslomp.display.imager.tpproc as imager
+import vslomp.display.screen.tpproc as screen
+
 
 def main():
     print("very SLO movie player")
@@ -18,15 +17,9 @@ def main():
 
     with screen.ScreenProcHandle(EPD()) as scp, imager.ImagerProcHandle(None) as icp:
 
-        def icp_handler(hcmd: imager.ImagerCommandHandle, img: Image):
-            if  hcmd.cmd == imager.CommandId.ENSURE_SIZE:
-                cmd = imager.ConvertCmd(img, "1", FLOYDSTEINBERG)
-                cmd.onresult = icp_handler
-                icp.send(cmd, tags=hcmd.tags)
-            else:
-                c = screen.DisplayCmd(img)
-                scp.send(c, tags=hcmd.tags)
-                scp.send(screen.WaitCmd(1))
+        def _display(img: Image, tags: Container[Any]) -> None:
+            scp.send(screen.DisplayCmd(img), tags=tags)
+            scp.send(screen.WaitCmd(1.25))
 
         icp.start()
 
@@ -46,8 +39,13 @@ def main():
 
                 print(x, frame)
                 cmd = imager.EnsureSizeCmd(frame.to_image(), (800, 480), 0)
-                cmd.onresult = icp_handler
-                icp.send(cmd, tags=[("frame", x)])
+                icp.send(cmd, tags=[("frame", x)]).then(
+                    lambda res, tags: icp.send(
+                        imager.ConvertCmd(res, "1", FLOYDSTEINBERG), tags=tags
+                    ).then(_display)
+                )
+
+                icp.send(imager.LoadFileCmd(""))
 
         icp.join()
         scp.join()
@@ -59,4 +57,5 @@ def main():
     return None
 
 
-main()
+if __name__ == "__main__":
+    main()

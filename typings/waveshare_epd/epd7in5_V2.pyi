@@ -24,7 +24,7 @@ class EPD:
     def ReadBusy(self):
         ...
     
-    def init(self):
+    def init(self) -> None:
         ...
     
     def getbuffer(self, image: 'Image') -> List[int]:
@@ -33,13 +33,13 @@ class EPD:
     def display(self, image: List[int]) -> Any:
         ...
     
-    def Clear(self):
+    def Clear(self) -> None:
         ...
     
-    def sleep(self):
+    def sleep(self) -> None:
         ...
     
-    def Dev_exit(self):
+    def Dev_exit(self) -> None:
         ...
     
 
