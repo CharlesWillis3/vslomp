@@ -45,8 +45,6 @@ def main():
                     ).then(_display)
                 )
 
-                icp.send(imager.LoadFileCmd(""))
-
         icp.join()
         scp.join()
 

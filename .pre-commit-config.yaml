@@ -33,7 +33,7 @@ repos:
       #   name: pytest
       #   stages: [commit]
       #   language: system
-      #   entry: pipenv run python -m pytest
+      #   entry: pipenv run python -m pytest lib/cmdq
       #   types: [python]
 
       # - id: pytest-cov
