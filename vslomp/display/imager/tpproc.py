@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import BinaryIO, Optional, Tuple, Union
 
 from cmdq.base import Command, CommandHandle, CommandProcessor
-from cmdq.processors.threadpool import CmdProcessor, ProcHandle
+from cmdq.processors.threadpool import Processor, ProcessorHandle
 from PIL import Image
 
 
@@ -14,13 +14,14 @@ class CommandId(enum.Enum):
     ENSURE_SIZE = enum.auto()
 
 
-ImagerProcessor = CmdProcessor[CommandId, None]
+ImageProcessor = CommandProcessor[CommandId, None]
+_ImagerProcessor = Processor[CommandId, None]
 
 
-class ImagerProcHandle(ProcHandle[CommandId, None]):
+class ImagerProcessorHandle(ProcessorHandle[CommandId, None]):
     @classmethod
     def factory(cls, cxt: None) -> CommandProcessor[CommandId, None]:
-        return ImagerProcessor("Imager", cxt)
+        return _ImagerProcessor("Imager", cxt)
 
 
 _ImagerCommand = Command[CommandId, None, Image.Image]
@@ -31,10 +32,6 @@ class LoadFileCmd(_ImagerCommand):
     cmdId = CommandId.LOAD_FILE
 
     fp: Union[str, pathlib.Path, BinaryIO]
-
-    @property
-    def cmd(self) -> CommandId:
-        return CommandId.LOAD_FILE
 
     def exec(self, hcmd: CommandHandle[CommandId, Image.Image], cxt: None) -> Image.Image:
         return Image.open(self.fp)
@@ -47,10 +44,6 @@ class ConvertCmd(_ImagerCommand):
     img: Image.Image
     mode: Optional[str]
     dither: int = Image.FLOYDSTEINBERG
-
-    @property
-    def cmd(self) -> CommandId:
-        return CommandId.CONVERT
 
     def exec(self, hcmd: CommandHandle[CommandId, Image.Image], cxt: None) -> Image.Image:
         return self.img.convert(mode=self.mode, dither=self.dither)  # type:ignore

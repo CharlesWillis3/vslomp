@@ -15,5 +15,7 @@
     "python.terminal.activateEnvironment": false,
     "python.testing.pytestArgs": [
         "test"
-    ]
+    ],
+    "autoDocstring.includeName": true,
+    "autoDocstring.includeExtendedSummary": true
 }

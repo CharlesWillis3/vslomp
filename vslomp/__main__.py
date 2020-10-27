@@ -1,56 +1,43 @@
-import itertools
 import logging
 from typing import Any, Container
 
-import av
-import av.datasets
-from PIL.Image import FLOYDSTEINBERG, Image
-from waveshare_epd.epd7in5_V2 import EPD
+from PIL import Image
 
-import vslomp.display.imager.tpproc as imager
-import vslomp.display.screen.tpproc as screen
+import vslomp.display.proc as display
+import vslomp.video.proc as video
+from vslomp.display.proc import Cmd as dcmd
+from vslomp.video.proc import Cmd as vcmd
 
 
 def main():
     print("very SLO movie player")
     logging.basicConfig(level=logging.INFO)
 
-    with screen.ScreenProcHandle(EPD()) as scp, imager.ImagerProcHandle(None) as icp:
+    # icp.send(imager.LoadFile("/home/pi/images/001.jpg"), tags=["ensure_size"])
 
-        def _display(img: Image, tags: Container[Any]) -> None:
-            scp.send(screen.DisplayCmd(img), tags=tags)
-            scp.send(screen.WaitCmd(1.25))
+    with video.VideoProcessorHandle(None) as vph, display.create() as dph:
 
-        icp.start()
+        def _onimage(img: Image.Image, frame: int, tags: Container[Any]) -> None:
+            dph.send(dcmd.Display(img, frame, 1.25), tags=tags)
 
-        scp.send(screen.InitCmd())
-        scp.send(screen.ClearCmd())
-        # icp.send(imager.LoadFile("/home/pi/images/001.jpg"), tags=["ensure_size"])
+        dph.send(dcmd.Init())
+        dph.send(dcmd.Clear())
 
-        with av.open(
-            "/home/pi/video/BATMAN_V_SUPERMAN_DAWN_OF_JUSTICE_TRAILER_6A_480.mov"
-        ) as container:
-            stream = container.streams.video[0]
-            stream.codec_context.skip_frame = "NONKEY"
+        vph.send(
+            vcmd.GenerateImages(
+                "/home/pi/video/BATMAN_V_SUPERMAN_DAWN_OF_JUSTICE_TRAILER_6A_480.mov",
+                _onimage,
+                video_stream=0,
+                skip_frame="NONKEY",
+                step=20,
+            )
+        )
 
-            for x, frame in enumerate(itertools.islice(container.decode(stream), 100, None)):
-                if not x % 10 == 0:
-                    continue
-
-                print(x, frame)
-                cmd = imager.EnsureSizeCmd(frame.to_image(), (800, 480), 0)
-                icp.send(cmd, tags=[("frame", x)]).then(
-                    lambda res, tags: icp.send(
-                        imager.ConvertCmd(res, "1", FLOYDSTEINBERG), tags=tags
-                    ).then(_display)
-                )
-
-        icp.join()
-        scp.join()
-
-        scp.send(screen.ClearCmd(), 100)
-        scp.send(screen.SleepCmd(), 100)
-        scp.send(screen.UninitCmd(), 100)
+        vph.join()
+        dph.join()
+        dph.send(dcmd.Finish())
+        dph.send(dcmd.Sleep())
+        dph.join()
 
     return None
 
