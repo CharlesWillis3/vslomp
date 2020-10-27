@@ -29,12 +29,12 @@ repos:
         types: [python]
         exclude: setup.py
 
-      # - id: pytest
-      #   name: pytest
-      #   stages: [commit]
-      #   language: system
-      #   entry: pipenv run python -m pytest lib/cmdq
-      #   types: [python]
+      - id: pytest
+        name: pytest
+        stages: [commit]
+        language: system
+        entry: pipenv run python -m pytest lib/cmdq
+        types: [python]
 
       # - id: pytest-cov
       #   name: pytest
