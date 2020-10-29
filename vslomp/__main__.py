@@ -18,20 +18,23 @@ def main():
     with video.VideoProcessorHandle(None) as vph, display.create() as dph:
 
         def _onimage(img: Image.Image, frame: int, tags: Container[Any]) -> None:
-            dph.send(dcmd.Display(img, frame, 1.25), tags=tags)
+            dph.send(dcmd.Display(img, frame, 0), tags=[("frame", frame)])
+
+        def _generate(res: video.LoadResult, tags: Container[Any]) -> None:
+            print("HEY!!", res.frames)
+            vph.send(vcmd.GenerateImages(res, _onimage))
+            vph.send(vcmd.Unload())
 
         dph.send(dcmd.Init())
         dph.send(dcmd.Clear())
 
         vph.send(
-            vcmd.GenerateImages(
+            vcmd.Load(
                 "/home/pi/video/BATMAN_V_SUPERMAN_DAWN_OF_JUSTICE_TRAILER_6A_480.mov",
-                _onimage,
                 video_stream=0,
                 skip_frame="NONKEY",
-                step=20,
             )
-        )
+        ).then(_generate)
 
         vph.join()
         dph.join()

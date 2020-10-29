@@ -8,8 +8,8 @@ import cmdq.processors.threadpool as qtp
 import PIL.Image as Image
 from cmdq.base import logevent
 
-import vslomp.display.imager.tpproc as imager
-import vslomp.display.screen.tpproc as screen
+import vslomp.display.imager.proc as imager
+import vslomp.display.screen.proc as screen
 import vslomp.display.screen.utils as screen_utils
 import vslomp.display.utils as disp_utils
 
@@ -58,13 +58,13 @@ class Cmd:
         cmdId = CommandId.INIT
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            cxt.screen.send(screen.InitCmd())
+            cxt.screen.send(screen.Cmd.Init())
 
     class Clear(_DisplayCommand):
         cmdId = CommandId.CLEAR
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            cxt.screen.send(screen.ClearCmd())
+            cxt.screen.send(screen.Cmd.Clear())
 
     @dataclasses.dataclass
     class Display(_DisplayCommand):
@@ -76,15 +76,17 @@ class Cmd:
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
             def _display(img: Image.Image, tags: disp_utils.Tags):
-                cxt.screen.send(screen.DisplayCmd(img), tags=tags)
+                cxt.screen.send(screen.Cmd.Display(img), tags=tags)
                 if self.wait:
-                    cxt.screen.send(screen.WaitCmd(self.wait))
+                    cxt.screen.send(screen.Cmd.Wait(self.wait))
 
             def _convert(img: Image.Image, tags: disp_utils.Tags):
-                cxt.imager.send(imager.ConvertCmd(img, "1", Image.FLOYDSTEINBERG)).then(_display)
+                cxt.imager.send(
+                    imager.Cmd.Convert(img, "1", Image.FLOYDSTEINBERG), tags=tags
+                ).then(_display)
 
             cxt.imager.send(
-                imager.EnsureSizeCmd(self.img, screen_utils.screen_size, Image.ANTIALIAS),
+                imager.Cmd.EnsureSize(self.img, screen_utils.screen_size, Image.ANTIALIAS),
                 tags=[("frame", self.frame)],
             ).then(_convert)
 
@@ -99,8 +101,8 @@ class Cmd:
         cmdId = CommandId.SLEEP
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            cxt.screen.send(screen.ClearCmd(), 100)
-            cxt.screen.send(screen.SleepCmd(), 101)
-            cxt.screen.send(screen.UninitCmd(), 102)
+            cxt.screen.send(screen.Cmd.Clear(), 100)
+            cxt.screen.send(screen.Cmd.Sleep(), 101)
+            cxt.screen.send(screen.Cmd.Uninit(), 102)
 
             cxt.screen.join()
