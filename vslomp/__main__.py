@@ -18,14 +18,14 @@ def main():
     with video.VideoProcessorHandle(None) as vph, display.create() as dph:
 
         def _onimage(img: Image.Image, frame: int, tags: Container[Any]) -> None:
-            dph.send(dcmd.Display(img, frame, 0), tags=[("frame", frame)])
+            dph.send(dcmd.Display(img, frame), tags=[("frame", frame)])
 
         def _generate(res: video.LoadResult, tags: Container[Any]) -> None:
             print("HEY!!", res.frames)
-            vph.send(vcmd.GenerateImages(res, _onimage))
+            vph.send(vcmd.GenerateImages(res, _onimage, start=0, step=1))
             vph.send(vcmd.Unload())
 
-        dph.send(dcmd.Init())
+        dph.send(dcmd.Init(wait=2.5))
         dph.send(dcmd.Clear())
 
         vph.send(
@@ -37,6 +37,7 @@ def main():
         ).then(_generate)
 
         vph.join()
+        vph.halt()
         dph.join()
         dph.send(dcmd.Finish())
         dph.send(dcmd.Sleep())

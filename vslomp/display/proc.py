@@ -1,7 +1,11 @@
 import dataclasses
 import enum
+from concurrent.futures import Future
+from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import contextmanager
-from typing import Any, Iterator, NamedTuple, Optional
+from queue import Queue
+from threading import Timer
+from typing import Any, Iterator, NamedTuple, Optional, Tuple
 
 import cmdq.base as qbase
 import cmdq.processors.threadpool as qtp
@@ -52,13 +56,36 @@ def create() -> Iterator[DisplayProcessor]:
 
 _DisplayCommand = qbase.Command[CommandId, Context, Result]
 
+_buffer: "Queue[Tuple[Image.Image, disp_utils.Tags]]" = Queue()
+_executor = ThreadPoolExecutor(thread_name_prefix="Buffer")
+last_push_future: "Optional[Future[None]]" = None
+
 
 class Cmd:
+    @dataclasses.dataclass
     class Init(_DisplayCommand):
         cmdId = CommandId.INIT
 
+        wait: Optional[float] = None
+
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
+            def _pushnext():
+                _wait = self.wait if self.wait else 0.0
+                timer = Timer(_wait, _display)
+                timer.setName("PushNext")
+                timer.start()
+
+            def _schedule(res: None, tags: Any):
+                global last_push_future
+                last_push_future = _executor.submit(_pushnext)
+
+            def _display():
+                img, tags = _buffer.get(block=True)
+                cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(_schedule)
+                _buffer.task_done()
+
             cxt.screen.send(screen.Cmd.Init())
+            _schedule(None, None)
 
     class Clear(_DisplayCommand):
         cmdId = CommandId.CLEAR
@@ -72,18 +99,15 @@ class Cmd:
 
         img: Image.Image
         frame: Optional[int]
-        wait: Optional[float]
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            def _display(img: Image.Image, tags: disp_utils.Tags):
-                cxt.screen.send(screen.Cmd.Display(img), tags=tags)
-                if self.wait:
-                    cxt.screen.send(screen.Cmd.Wait(self.wait))
+            def _bufferput(img: Image.Image, tags: disp_utils.Tags):
+                _buffer.put((img, tags), block=True)
 
             def _convert(img: Image.Image, tags: disp_utils.Tags):
                 cxt.imager.send(
                     imager.Cmd.Convert(img, "1", Image.FLOYDSTEINBERG), tags=tags
-                ).then(_display)
+                ).then(_bufferput)
 
             cxt.imager.send(
                 imager.Cmd.EnsureSize(self.img, screen_utils.screen_size, Image.ANTIALIAS),
@@ -95,14 +119,21 @@ class Cmd:
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
             cxt.imager.join()
-            cxt.screen.join()
+            cxt.imager.halt()
+            _buffer.join()
 
     class Sleep(_DisplayCommand):
         cmdId = CommandId.SLEEP
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
+            global last_push_future
+            cxt.screen.join()
             cxt.screen.send(screen.Cmd.Clear(), 100)
             cxt.screen.send(screen.Cmd.Sleep(), 101)
             cxt.screen.send(screen.Cmd.Uninit(), 102)
-
             cxt.screen.join()
+
+            _last_push_future = last_push_future
+            if _last_push_future:
+                _last_push_future.cancel()
+            _executor.shutdown(wait=False)
