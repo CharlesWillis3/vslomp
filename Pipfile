@@ -21,6 +21,7 @@ setuptools = "*"
 cmdq = {editable = true, path = "./lib/cmdq"}
 pillow = "*"
 av = "*"
+urwid = "*"
 
 [requires]
 python_version = "3.8"

@@ -13,8 +13,6 @@ def main():
     print("very SLO movie player")
     logging.basicConfig(level=logging.INFO)
 
-    # icp.send(imager.LoadFile("/home/pi/images/001.jpg"), tags=["ensure_size"])
-
     with video.VideoProcessorHandle(None) as vph, display.create() as dph:
 
         def _onimage(img: Image.Image, frame: int, tags: Container[Any]) -> None:
@@ -22,11 +20,13 @@ def main():
 
         def _generate(res: video.LoadResult, tags: Container[Any]) -> None:
             print("HEY!!", res.frames)
-            vph.send(vcmd.GenerateImages(res, _onimage, start=0, step=1))
+            vph.send(vcmd.GenerateImages(res, _onimage, start=10, step=5))
             vph.send(vcmd.Unload())
 
-        dph.send(dcmd.Init(wait=2.5))
-        dph.send(dcmd.Clear())
+        dph.send(dcmd.Init(wait=60 * 5))
+        dph.send(dcmd.Clear(), pri=45)
+
+        dph.send(dcmd.Splashscreen(("/home/pi/images/001.jpg")), pri=46)
 
         vph.send(
             vcmd.Load(

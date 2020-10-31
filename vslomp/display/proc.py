@@ -3,9 +3,10 @@ import enum
 from concurrent.futures import Future
 from concurrent.futures.thread import ThreadPoolExecutor
 from contextlib import contextmanager
+from pathlib import Path
 from queue import Queue
 from threading import Timer
-from typing import Any, Iterator, NamedTuple, Optional, Tuple
+from typing import Any, BinaryIO, ClassVar, Iterator, NamedTuple, Optional, Tuple, Union
 
 import cmdq.base as qbase
 import cmdq.processors.threadpool as qtp
@@ -29,6 +30,7 @@ Result = Any
 class CommandId(enum.Enum):
     INIT = enum.auto()
     CLEAR = enum.auto()
+    SPLASHSCREEN = enum.auto()
     DISPLAY = enum.auto()
     FINISH = enum.auto()
     SLEEP = enum.auto()
@@ -58,40 +60,67 @@ _DisplayCommand = qbase.Command[CommandId, Context, Result]
 
 _buffer: "Queue[Tuple[Image.Image, disp_utils.Tags]]" = Queue()
 _executor = ThreadPoolExecutor(thread_name_prefix="Buffer")
-last_push_future: "Optional[Future[None]]" = None
+last_timer: Optional[Timer] = None
 
 
 class Cmd:
     @dataclasses.dataclass
     class Init(_DisplayCommand):
         cmdId = CommandId.INIT
+        firstFrame: ClassVar[bool] = True
 
         wait: Optional[float] = None
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            def _pushnext():
+            def _pushnext(res: None, tags: Any):
                 _wait = self.wait if self.wait else 0.0
+                if Cmd.Init.firstFrame:
+                    _wait = 0.0
+                    Cmd.Init.firstFrame = False
                 timer = Timer(_wait, _display)
                 timer.setName("PushNext")
                 timer.start()
 
-            def _schedule(res: None, tags: Any):
-                global last_push_future
-                last_push_future = _executor.submit(_pushnext)
-
             def _display():
                 img, tags = _buffer.get(block=True)
-                cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(_schedule)
+                cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(_pushnext)
                 _buffer.task_done()
 
             cxt.screen.send(screen.Cmd.Init())
-            _schedule(None, None)
+            _pushnext(None, None)
 
     class Clear(_DisplayCommand):
         cmdId = CommandId.CLEAR
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
             cxt.screen.send(screen.Cmd.Clear())
+
+    @dataclasses.dataclass
+    class Splashscreen(_DisplayCommand):
+        cmdId = CommandId.SPLASHSCREEN
+
+        resource: Union[str, Path, BinaryIO]
+
+        def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
+            def _display(img: Image.Image, tags: Any):
+                cxt.screen.send(screen.Cmd.Display(img), pri=45, tags=tags)
+
+            def _convert(img: Image.Image, tags: Any):
+                cxt.imager.send(
+                    imager.Cmd.Convert(img, mode="1", dither=Image.FLOYDSTEINBERG), tags=tags
+                ).then(_display)
+
+            def _size(img: Image.Image, tags: Any):
+                cxt.imager.send(
+                    imager.Cmd.EnsureSize(
+                        img, screen_utils.screen_size, fill=0, resample=Image.ANTIALIAS
+                    ),
+                    tags=tags,
+                ).then(_convert)
+
+            cxt.imager.send(imager.Cmd.LoadFile(self.resource), tags=[("splashscreen", 0)]).then(
+                _size
+            )
 
     @dataclasses.dataclass
     class Display(_DisplayCommand):
@@ -126,14 +155,17 @@ class Cmd:
         cmdId = CommandId.SLEEP
 
         def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: Context) -> Result:
-            global last_push_future
+            global last_timer
             cxt.screen.join()
             cxt.screen.send(screen.Cmd.Clear(), 100)
             cxt.screen.send(screen.Cmd.Sleep(), 101)
             cxt.screen.send(screen.Cmd.Uninit(), 102)
             cxt.screen.join()
 
-            _last_push_future = last_push_future
-            if _last_push_future:
-                _last_push_future.cancel()
+            # _last_push_future = last_push_future
+            # if _last_push_future:
+            #     _last_push_future.cancel()
+            _last_timer = last_timer
+            if _last_timer:
+                _last_timer.cancel()
             _executor.shutdown(wait=False)
