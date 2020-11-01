@@ -8,7 +8,8 @@
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.analysis.extraPaths": [
-        "vslomp"
+        "vslomp",
+        "/home/pi/.local/share/virtualenvs/vslomp-4Mm0UnRM/src/cmdq"
     ],
     "python.testing.cwd": "~/dev/vslomp",
     "terminal.integrated.inheritEnv": false,

@@ -4,8 +4,7 @@ import itertools
 from typing import TYPE_CHECKING, Any, Callable, Container, ContextManager, NamedTuple, Optional
 
 import av
-import cmdq.base as qbase
-import cmdq.processors.threadpool as qtp
+import qcmd.processors.executor as q
 from PIL import Image
 
 if TYPE_CHECKING:
@@ -20,17 +19,12 @@ class CommandId(enum.Enum):
     UNLOAD = enum.auto()
 
 
-VideoProcessor = qbase.CommandProcessor[CommandId, None]
-_VideoProcessor = qtp.Processor[CommandId, None]
+class VideoProcessorFactory(q.ProcessorFactory[CommandId, None]):
+    procname = "Video"
 
 
-class VideoProcessorHandle(qtp.ProcessorHandle[CommandId, None]):
-    @classmethod
-    def factory(cls, cxt: None = None) -> qbase.CommandProcessor[CommandId, None]:
-        return _VideoProcessor("Video", cxt)
-
-
-_VideoCommand = qbase.Command[CommandId, None, Result]
+_VideoCommand = q.Command[CommandId, None, Result]
+VideoCommandHandle = q.CommandHandle[CommandId, Result]
 
 
 class LoadResult(NamedTuple):
@@ -64,19 +58,19 @@ def _load(resource: str, video_stream: int, skip_frame: Optional[str] = None):
 
 class Cmd:
     @dataclasses.dataclass
-    class Load(qbase.Command[CommandId, None, LoadResult]):
-        cmdId = CommandId.LOAD
+    class Load(q.Command[CommandId, None, LoadResult]):
+        cmdid = CommandId.LOAD
 
         resource: str
         video_stream: int
         skip_frame: Optional[str] = None
 
-        def exec(self, hcmd: qbase.CommandHandle[CommandId, LoadResult], cxt: None) -> LoadResult:
+        def exec(self, hcmd: q.CommandHandle[CommandId, LoadResult], cxt: None) -> LoadResult:
             return _load(self.resource, self.video_stream, self.skip_frame)
 
     @dataclasses.dataclass
     class GenerateImages(_VideoCommand):
-        cmdId = CommandId.GENERATE_IMAGES
+        cmdid = CommandId.GENERATE_IMAGES
 
         loadresult: LoadResult
         onimage: Callable[[Image.Image, int, Container[Any]], None]
@@ -84,7 +78,7 @@ class Cmd:
         stop: Optional[int] = None
         step: Optional[int] = None
 
-        def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: None) -> Result:
+        def exec(self, hcmd: VideoCommandHandle, cxt: None) -> Result:
             _start = self.start if self.start else 0
             _step = self.step if self.step else 1
 
@@ -102,9 +96,9 @@ class Cmd:
                 self.onimage(vframe.to_image(), _calcframe(x), hcmd.tags)
 
     class Unload(_VideoCommand):
-        cmdId = CommandId.UNLOAD
+        cmdid = CommandId.UNLOAD
 
-        def exec(self, hcmd: qbase.CommandHandle[CommandId, Result], cxt: None) -> Result:
+        def exec(self, hcmd: VideoCommandHandle, cxt: None) -> Result:
             global _loaded_manager
             if _loaded_manager:
                 _loaded_manager.__exit__(None, None, None)

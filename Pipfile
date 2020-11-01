@@ -18,10 +18,10 @@ waveshare-epd = {editable = false, path = "./ext/e-Paper/RaspberryPi&JetsonNano/
 spidev = "*"
 "rpi.gpio" = "*"
 setuptools = "*"
-cmdq = {editable = true, path = "./lib/cmdq"}
 pillow = "*"
 av = "*"
 urwid = "*"
+qcmd = {editable = true, git = "https://github.com/libanvl/python-qcmd", ref = "v0.0.5-pre3"}
 
 [requires]
 python_version = "3.8"

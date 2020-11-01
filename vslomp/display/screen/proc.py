@@ -1,12 +1,11 @@
+import dataclasses
 import enum
-from dataclasses import dataclass
 from time import sleep
 
-from cmdq.base import Command, CommandHandle, CommandProcessor
-from cmdq.processors.threadpool import Processor, ProcessorHandle
+import qcmd.processors.executor as q
 from PIL.Image import Image
 
-from .utils import Screen
+from .utils import EPDMonochromeProtocol
 
 
 class CommandId(enum.Enum):
@@ -18,56 +17,62 @@ class CommandId(enum.Enum):
     UNINIT = enum.auto()
 
 
-ScreenProcessor = CommandProcessor[CommandId, Screen]
-_ScreenProcessor = Processor[CommandId, Screen]
+class ScreenProcessorFactory(q.ProcessorFactory[CommandId, EPDMonochromeProtocol]):
+    procname = "Screen"
 
 
-class ScreenProcessorHandle(ProcessorHandle[CommandId, Screen]):
-    @classmethod
-    def factory(cls, cxt: Screen) -> CommandProcessor[CommandId, Screen]:
-        return _ScreenProcessor("Screen", cxt)
+ScreenProcessor = q.Processor[CommandId, EPDMonochromeProtocol]
 
 
-_ScreenCommand = Command[CommandId, Screen, None]
+_ScreenCommand = q.Command[CommandId, EPDMonochromeProtocol, None]
+ScreenCommandHandle = q.CommandHandle[CommandId, None]
 
 
 class Cmd:
     class Init(_ScreenCommand):
-        cmdId = CommandId.INIT
+        cmdid = CommandId.INIT
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             cxt.init()
 
-    class Clear(_ScreenCommand):
-        cmdId = CommandId.CLEAR
+    INIT = Init()
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+    class Clear(_ScreenCommand):
+        cmdid = CommandId.CLEAR
+
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             cxt.Clear()
 
-    @dataclass
+    CLEAR = Clear()
+
+    @dataclasses.dataclass
     class Display(_ScreenCommand):
-        cmdId = CommandId.DISPLAY
+        cmdid = CommandId.DISPLAY
         img: Image
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             cxt.display(cxt.getbuffer(self.img))
 
-    @dataclass
+    @dataclasses.dataclass
     class Wait(_ScreenCommand):
-        cmdId = CommandId.WAIT
+        cmdid = CommandId.WAIT
         wait: float
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             sleep(self.wait)
 
     class Sleep(_ScreenCommand):
-        cmdId = CommandId.SLEEP
+        cmdid = CommandId.SLEEP
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             cxt.sleep()
 
-    class Uninit(_ScreenCommand):
-        cmdId = CommandId.UNINIT
+    SLEEP = Sleep()
 
-        def exec(self, hcmd: CommandHandle[CommandId, None], cxt: Screen) -> None:
+    class Uninit(_ScreenCommand):
+        cmdid = CommandId.UNINIT
+
+        def exec(self, hcmd: ScreenCommandHandle, cxt: EPDMonochromeProtocol) -> None:
             cxt.Dev_exit()
+
+    UNINIT = Uninit()

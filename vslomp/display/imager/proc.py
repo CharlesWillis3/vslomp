@@ -1,10 +1,9 @@
+import dataclasses
 import enum
 import pathlib
-from dataclasses import dataclass
 from typing import BinaryIO, Optional, Tuple, Union
 
-from cmdq.base import Command, CommandHandle, CommandProcessor
-from cmdq.processors.threadpool import Processor, ProcessorHandle
+import qcmd.processors.executor as q
 from PIL import Image
 
 
@@ -14,50 +13,47 @@ class CommandId(enum.Enum):
     ENSURE_SIZE = enum.auto()
 
 
-ImageProcessor = CommandProcessor[CommandId, None]
-_ImagerProcessor = Processor[CommandId, None]
+class ImagerProcessorFactory(q.ProcessorFactory[CommandId, None]):
+    procname = "Imager"
 
 
-class ImagerProcessorHandle(ProcessorHandle[CommandId, None]):
-    @classmethod
-    def factory(cls, cxt: None = None) -> CommandProcessor[CommandId, None]:
-        return _ImagerProcessor("Imager", cxt)
+ImagerProcessor = q.Processor[CommandId, None]
 
-
-_ImagerCommand = Command[CommandId, None, Image.Image]
+ImagerCommandHandle = q.CommandHandle[CommandId, Image.Image]
+_ImagerCommand = q.Command[CommandId, None, Image.Image]
 
 
 class Cmd:
-    @dataclass
+    @dataclasses.dataclass
     class LoadFile(_ImagerCommand):
-        cmdId = CommandId.LOAD_FILE
+        cmdid = CommandId.LOAD_FILE
 
         fp: Union[str, pathlib.Path, BinaryIO]
 
-        def exec(self, hcmd: CommandHandle[CommandId, Image.Image], cxt: None) -> Image.Image:
+        def exec(self, hcmd: ImagerCommandHandle, cxt: None) -> Image.Image:
             return Image.open(self.fp)
 
-    @dataclass
+    @dataclasses.dataclass
     class Convert(_ImagerCommand):
-        cmdId = CommandId.CONVERT
+        cmdid = CommandId.CONVERT
 
         img: Image.Image
         mode: Optional[str]
         dither: int = Image.FLOYDSTEINBERG
 
-        def exec(self, hcmd: CommandHandle[CommandId, Image.Image], cxt: None) -> Image.Image:
+        def exec(self, hcmd: ImagerCommandHandle, cxt: None) -> Image.Image:
             return self.img.convert(mode=self.mode, dither=self.dither)  # type:ignore
 
-    @dataclass
+    @dataclasses.dataclass
     class EnsureSize(_ImagerCommand):
-        cmdId = CommandId.ENSURE_SIZE
+        cmdid = CommandId.ENSURE_SIZE
 
         img: Image.Image
         size: Tuple[int, int]
         fill: int = 0
         resample: int = Image.ANTIALIAS
 
-        def exec(self, hcmd: CommandHandle[CommandId, Image.Image], cxt: None) -> Image.Image:
+        def exec(self, hcmd: ImagerCommandHandle, cxt: None) -> Image.Image:
             in_img = self.img
             in_img.thumbnail(self.size, resample=self.resample)
 
