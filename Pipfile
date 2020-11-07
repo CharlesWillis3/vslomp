@@ -1,27 +1,34 @@
 [[source]]
+name = "piwheels"
+url = "https://www.piwheels.org/simple"
+verify_ssl = true
+
+[[source]]
 name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
 black = "*"
-isort = "*"
 flake8 = "*"
+isort = "*"
+nodeenv = "*"
+pre-commit = "*"
 pytest = "*"
 pytest-cov = "*"
 pytest-asyncio = "*"
-nodeenv = "*"
-pre-commit = "*"
 
 [packages]
-waveshare-epd = {editable = false, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
-spidev = "*"
+av = "*"
+grpclib = "*"
+pillow = "*"
 "rpi.gpio" = "*"
 setuptools = "*"
-pillow = "*"
-av = "*"
-urwid = "*"
-qcmd = {editable = true, git = "https://github.com/libanvl/python-qcmd", ref = "v0.0.5-pre3"}
+qcmd = "*"
+spidev = "*"
+waveshare-epd = {editable = false, path = "./ext/e-Paper/RaspberryPi&JetsonNano/python"}
+protoflux = {editable = true, git = "https://github.com/libanvl/python-protoflux"}
+betterproto = {git = "https://github.com/danielgtaylor/python-betterproto"}
 
 [requires]
 python_version = "3.8"
@@ -31,4 +38,5 @@ allow_prereleases = true
 
 [scripts]
 pyright = "node node_modules/pyright"
+protoc = "protoc -I ./proto --python_betterproto_out=vslomp/gen"
 vslomp = "python -m vslomp"

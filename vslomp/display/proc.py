@@ -22,6 +22,7 @@ from vslomp.display.screen.utils import EPDMonochromeProtocol
 class Context(NamedTuple):
     screen: qcore.CommandProcessor[screen.CommandId, EPDMonochromeProtocol]
     imager: qcore.CommandProcessor[imager.CommandId, None]
+    screen_size: Tuple[int, int]
 
 
 Result = Any
@@ -46,11 +47,15 @@ _DisplayCommand = q.Command[CommandId, Context, None]
 
 
 @contextlib.contextmanager
-def create(executor: conc.Executor):
+def create(screen_name: str, executor: conc.Executor):
+    (
+        epd,
+        size,
+    ) = screen_utils.get_screen(screen_name)
     with screen.ScreenProcessorFactory(
-        executor=executor, cxt=screen_utils.Screen
+        executor=executor, cxt=epd
     ) as sph, imager.ImagerProcessorFactory(executor=executor, cxt=None) as iph:
-        with DisplayProcessorFactory(executor=executor, cxt=Context(sph, iph)) as dph:
+        with DisplayProcessorFactory(executor=executor, cxt=Context(sph, iph, size)) as dph:
             yield dph
     logevent("EXIT", "DisplayProcessorContextManager")
 
@@ -114,9 +119,7 @@ class Cmd:
 
             def _size(img: Image.Image, tags: Any):
                 cxt.imager.send(
-                    imager.Cmd.EnsureSize(
-                        img, screen_utils.screen_size, fill=0, resample=Image.ANTIALIAS
-                    ),
+                    imager.Cmd.EnsureSize(img, cxt.screen_size, fill=0, resample=Image.ANTIALIAS),
                     pri=45,
                     tags=tags,
                 ).then(_convert)
@@ -142,7 +145,7 @@ class Cmd:
                 ).then(_bufferput)
 
             cxt.imager.send(
-                imager.Cmd.EnsureSize(self.img, screen_utils.screen_size, Image.ANTIALIAS),
+                imager.Cmd.EnsureSize(self.img, cxt.screen_size, Image.ANTIALIAS),
                 tags=[("frame", self.frame)],
             ).then(_convert)
 

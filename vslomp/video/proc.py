@@ -62,11 +62,11 @@ class Cmd:
         cmdid = CommandId.LOAD
 
         resource: str
-        video_stream: int
-        skip_frame: Optional[str] = None
+        vstream_idx: int
+        skip_frame: str
 
         def exec(self, hcmd: q.CommandHandle[CommandId, LoadResult], cxt: None) -> LoadResult:
-            return _load(self.resource, self.video_stream, self.skip_frame)
+            return _load(self.resource, self.vstream_idx, self.skip_frame)
 
     @dataclasses.dataclass
     class GenerateImages(_VideoCommand):

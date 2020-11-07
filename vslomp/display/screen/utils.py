@@ -1,5 +1,5 @@
 import importlib
-from typing import Protocol, Sequence, cast
+from typing import Protocol, Sequence, Tuple, Type, cast
 
 from PIL import Image
 
@@ -27,7 +27,13 @@ class EPDMonochromeProtocol(Protocol):
         raise NotImplementedError
 
 
-epd_module = importlib.import_module("waveshare_epd." + "epd7in5_V2")
-_EPD = getattr(epd_module, "EPD")
-Screen = cast(EPDMonochromeProtocol, _EPD())
-screen_size = (getattr(epd_module, "EPD_WIDTH"), getattr(epd_module, "EPD_HEIGHT"))
+def get_screen(name: str) -> Tuple[EPDMonochromeProtocol, Tuple[int, int]]:
+    epd_module = importlib.import_module("waveshare_epd." + name)
+    screen_size = (
+        cast(int, getattr(epd_module, "EPD_WIDTH")),
+        cast(int, getattr(epd_module, "EPD_HEIGHT")),
+    )
+
+    epd_class = cast(Type[EPDMonochromeProtocol], getattr(epd_module, "EPD"))
+
+    return (epd_class(), screen_size)

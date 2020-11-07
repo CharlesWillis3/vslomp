@@ -1,22 +1,6 @@
 {
-    "python.formatting.blackPath": "/home/pi/.local/share/virtualenvs/vslomp-4Mm0UnRM/bin/black",
-    "python.analysis.typeCheckingMode": "strict",
     "python.languageServer": "Pylance",
     "python.pythonPath": "/home/pi/.local/share/virtualenvs/vslomp-4Mm0UnRM/bin/python",
     "python.formatting.provider": "black",
-    "python.testing.unittestEnabled": false,
-    "python.testing.nosetestsEnabled": false,
-    "python.testing.pytestEnabled": true,
-    "python.analysis.extraPaths": [
-        "vslomp",
-        "/home/pi/.local/share/virtualenvs/vslomp-4Mm0UnRM/src/cmdq"
-    ],
-    "python.testing.cwd": "~/dev/vslomp",
-    "terminal.integrated.inheritEnv": false,
     "python.terminal.activateEnvironment": false,
-    "python.testing.pytestArgs": [
-        "test"
-    ],
-    "autoDocstring.includeName": true,
-    "autoDocstring.includeExtendedSummary": true
 }

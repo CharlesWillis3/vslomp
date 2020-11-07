@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package vslomp;
+
+import "google/protobuf/wrappers.proto";
+
+service PlayerService {
+  rpc LoadVideo(vslomp.LoadVideo) returns (vslomp.LoadVideoResult);
+  rpc Play(vslomp.Play) returns (stream vslomp.PlayResult);
+  rpc Unload(vslomp.Unload) returns (vslomp.UnloadResult);
+}
+
+message Result {
+  bool ok = 1;
+  string err = 2;
+}
+
+message LoadVideo {
+  string video_path = 1;
+  string splash_path = 2;
+  uint32 vstream_idx = 3;
+  float frame_wait = 4;
+}
+
+message LoadVideoResult {
+  Result result = 1;
+  uint32 frame_count = 2;
+}
+
+message Play {
+  google.protobuf.Int32Value start = 1;
+  google.protobuf.Int32Value stop = 2;
+  google.protobuf.Int32Value step = 3;
+}
+
+message PlayResult {
+  Result result = 1;
+  uint32 frame_idx = 2;
+  bool done = 3;
+}
+
+message Unload {
+}
+
+message UnloadResult {
+  Result result = 1;
+}
