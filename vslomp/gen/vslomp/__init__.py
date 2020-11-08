@@ -18,11 +18,26 @@ class Result(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class ShowScreen(betterproto.Message):
+    screen_path: str = betterproto.string_field(1)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+
+
+@dataclass(eq=False, repr=False)
+class ShowScreenResult(betterproto.Message):
+    result: "Result" = betterproto.message_field(1)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+
+
+@dataclass(eq=False, repr=False)
 class LoadVideo(betterproto.Message):
     video_path: str = betterproto.string_field(1)
-    splash_path: str = betterproto.string_field(2)
-    vstream_idx: int = betterproto.uint32_field(3)
-    frame_wait: float = betterproto.float_field(4)
+    vstream_idx: int = betterproto.uint32_field(2)
+    frame_wait: float = betterproto.float_field(3)
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -74,18 +89,21 @@ class UnloadResult(betterproto.Message):
 
 
 class PlayerServiceStub(betterproto.ServiceStub):
+    async def show_screen(self, *, screen_path: str = "") -> "ShowScreenResult":
+
+        request = ShowScreen()
+        request.screen_path = screen_path
+
+        return await self._unary_unary(
+            "/vslomp.PlayerService/ShowScreen", request, ShowScreenResult
+        )
+
     async def load_video(
-        self,
-        *,
-        video_path: str = "",
-        splash_path: str = "",
-        vstream_idx: int = 0,
-        frame_wait: float = 0.0,
+        self, *, video_path: str = "", vstream_idx: int = 0, frame_wait: float = 0.0
     ) -> "LoadVideoResult":
 
         request = LoadVideo()
         request.video_path = video_path
-        request.splash_path = splash_path
         request.vstream_idx = vstream_idx
         request.frame_wait = frame_wait
 

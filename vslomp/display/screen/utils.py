@@ -5,9 +5,6 @@ from PIL import Image
 
 
 class EPDMonochromeProtocol(Protocol):
-    def __init__(self) -> None:
-        raise NotImplementedError
-
     def init(self) -> None:
         raise NotImplementedError
 

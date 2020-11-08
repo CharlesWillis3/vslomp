@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Container, ContextManager, Name
 import av
 import qcmd.processors.executor as q
 from PIL import Image
+from qcmd.core import Command
 
 if TYPE_CHECKING:
     from av import InputContainer
@@ -23,6 +24,7 @@ class VideoProcessorFactory(q.ProcessorFactory[CommandId, None]):
     procname = "Video"
 
 
+VideoProcessor = q.Processor[Command, None]
 _VideoCommand = q.Command[CommandId, None, Result]
 VideoCommandHandle = q.CommandHandle[CommandId, Result]
 

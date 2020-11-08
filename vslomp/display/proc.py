@@ -29,7 +29,8 @@ Result = Any
 
 
 class CommandId(enum.Enum):
-    INIT = enum.auto()
+    INIT_SCREEN = enum.auto()
+    INIT_VIDEO = enum.auto()
     CLEAR = enum.auto()
     SPLASHSCREEN = enum.auto()
     DISPLAY = enum.auto()
@@ -66,8 +67,17 @@ last_timer: Optional[Timer] = None
 
 class Cmd:
     @dataclasses.dataclass
-    class Init(_DisplayCommand):
-        cmdid = CommandId.INIT
+    class InitScreen(_DisplayCommand):
+        cmdid = CommandId.INIT_SCREEN
+
+        def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
+            cxt.screen.send(screen.Cmd.Init(), pri=10).or_err(lambda ex, t: print(ex))
+
+    INIT_SCREEN = InitScreen()
+
+    @dataclasses.dataclass
+    class InitVideo(_DisplayCommand):
+        cmdid = CommandId.INIT_VIDEO
         firstFrame: ClassVar[bool] = True
 
         wait: Optional[float] = None
@@ -75,9 +85,9 @@ class Cmd:
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
             def _pushnext(res: None, tags: Any):
                 _wait = self.wait if self.wait else 0.0
-                if Cmd.Init.firstFrame:
+                if Cmd.InitVideo.firstFrame:
                     _wait = 0.0
-                    Cmd.Init.firstFrame = False
+                    Cmd.InitVideo.firstFrame = False
                 timer = Timer(_wait, _display)
                 timer.setName("PushNextFrame")
                 timer.start()
@@ -87,8 +97,7 @@ class Cmd:
                 cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(_pushnext)
                 _buffer.task_done()
 
-            cxt.screen.send(screen.Cmd.Init(), pri=10)
-
+            _buffer = Queue()
             # sends frames one-by-one to the screen processor so we have a chance to interrupt
             _pushnext(None, None)
 

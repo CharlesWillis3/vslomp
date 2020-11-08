@@ -1,54 +1,52 @@
+import asyncio
 import logging
+import os
+import tempfile
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import Any, Container
+from pathlib import Path
+from typing import Any, Container, Optional
 
 from grpclib.server import Server
+from grpclib.utils import graceful_exit
 from PIL import Image
 
-import vslomp.display.proc as display
+import vslomp.display.proc as disp
 import vslomp.video.proc as video
 from vslomp.display.proc import Cmd as dcmd
 from vslomp.server import PlayerService
 from vslomp.video.proc import Cmd as vcmd
 
+SOCKET_FILENAME = "vslomp.sock"
 
-def main():
+
+async def main(
+    screen_type: str, socket_path: Optional[str] = None, threads: int = 5, log_level: str = "INFO"
+):
     print("very SLO movie player")
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=log_level)
 
-    with ThreadPoolExecutor(5, thread_name_prefix="Server") as tpe:
-        with video.VideoProcessorFactory(tpe, None) as vph, display.create(
-            "epd7in5_V2", tpe
-        ) as dph:
+    with ThreadPoolExecutor(threads, thread_name_prefix="Server") as tpe:
+        with video.VideoProcessorFactory(tpe, None) as vph, disp.create(screen_type, tpe) as dph:
 
-            def _onimage(img: Image.Image, frame: int, tags: Container[Any]) -> None:
-                dph.send(dcmd.Display(img, frame), tags=[("frame", frame)])
-
-            def _generate(res: video.LoadResult, tags: Container[Any]) -> None:
-                print("HEY!!", res.frames)
-                vph.send(vcmd.GenerateImages(res, _onimage, start=80, step=10))
-                vph.send(vcmd.Unload())
-
-            dph.send(dcmd.Init(wait=2))
+            dph.send(dcmd.INIT_SCREEN, pri=10).or_err(lambda ex, t: print(ex, ex.__class__))
             dph.send(dcmd.CLEAR, pri=45)
 
-            player = PlayerService()
+            dph.join()
 
+            player = PlayerService(dph, vph)
             server = Server([player])
-            server.start(path="")
-            server.serve_forever()
 
-            dph.send(dcmd.Splashscreen(("/home/pi/images/001.jpg")), pri=46)
+            if socket_path is None:
+                appdata = Path.home() / ".vslomp"
+                appdata.mkdir(exist_ok=True)
+                socket_file = appdata / SOCKET_FILENAME
+                socket_path = str(socket_file)
 
-            vph.send(
-                vcmd.Load(
-                    "/home/pi/video/BATMAN_V_SUPERMAN_DAWN_OF_JUSTICE_TRAILER_6A_480.mov",
-                    vstream_idx=0,
-                    skip_frame="NONKEY",
-                )
-            ).then(_generate)
+            with graceful_exit([server]):
+                print("SERVING:", socket_path)
+                await server.start(path=socket_path)
+                await server.wait_closed()
 
-            vph.join()
             vph.halt()
             dph.join()
             dph.send(dcmd.FINISH)
@@ -59,4 +57,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main("epd7in5_V2", socket_path=None, threads=5))

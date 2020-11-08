@@ -5,6 +5,7 @@ package vslomp;
 import "google/protobuf/wrappers.proto";
 
 service PlayerService {
+  rpc ShowScreen(vslomp.ShowScreen) returns (vslomp.ShowScreenResult);
   rpc LoadVideo(vslomp.LoadVideo) returns (vslomp.LoadVideoResult);
   rpc Play(vslomp.Play) returns (stream vslomp.PlayResult);
   rpc Unload(vslomp.Unload) returns (vslomp.UnloadResult);
@@ -15,11 +16,18 @@ message Result {
   string err = 2;
 }
 
+message ShowScreen {
+  string screen_path = 1;
+}
+
+message ShowScreenResult {
+  Result result = 1;
+}
+
 message LoadVideo {
   string video_path = 1;
-  string splash_path = 2;
-  uint32 vstream_idx = 3;
-  float frame_wait = 4;
+  uint32 vstream_idx = 2;
+  float frame_wait = 3;
 }
 
 message LoadVideoResult {
