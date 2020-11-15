@@ -8,116 +8,58 @@ import betterproto
 import grpclib
 
 
+class OpenResultAction(betterproto.Enum):
+    UNKNOWN = 0
+    SPLASH_SCREEN = 1
+    LOAD_VIDEO = 2
+    PLAY_VIDEO = 3
+
+
 @dataclass(eq=False, repr=False)
-class Result(betterproto.Message):
-    ok: bool = betterproto.bool_field(1)
-    err: str = betterproto.string_field(2)
+class Open(betterproto.Message):
+    screen_path: Optional[str] = betterproto.message_field(1, wraps=betterproto.TYPE_STRING)
+    video_path: str = betterproto.string_field(2)
+    vstream_idx: Optional[int] = betterproto.message_field(3, wraps=betterproto.TYPE_UINT32)
+    frame_wait: float = betterproto.float_field(4)
+    start: Optional[int] = betterproto.message_field(5, wraps=betterproto.TYPE_INT32)
+    stop: Optional[int] = betterproto.message_field(6, wraps=betterproto.TYPE_INT32)
+    step: Optional[int] = betterproto.message_field(7, wraps=betterproto.TYPE_INT32)
 
     def __post_init__(self) -> None:
         super().__post_init__()
 
 
 @dataclass(eq=False, repr=False)
-class ShowScreen(betterproto.Message):
-    screen_path: str = betterproto.string_field(1)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class ShowScreenResult(betterproto.Message):
-    result: "Result" = betterproto.message_field(1)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class LoadVideo(betterproto.Message):
-    video_path: str = betterproto.string_field(1)
-    vstream_idx: int = betterproto.uint32_field(2)
-    frame_wait: float = betterproto.float_field(3)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class LoadVideoResult(betterproto.Message):
-    result: "Result" = betterproto.message_field(1)
-    frame_count: int = betterproto.uint32_field(2)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class Play(betterproto.Message):
-    start: Optional[int] = betterproto.message_field(1, wraps=betterproto.TYPE_INT32)
-    stop: Optional[int] = betterproto.message_field(2, wraps=betterproto.TYPE_INT32)
-    step: Optional[int] = betterproto.message_field(3, wraps=betterproto.TYPE_INT32)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class PlayResult(betterproto.Message):
-    result: "Result" = betterproto.message_field(1)
-    frame_idx: int = betterproto.uint32_field(2)
-    done: bool = betterproto.bool_field(3)
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class Unload(betterproto.Message):
-    pass
-
-    def __post_init__(self) -> None:
-        super().__post_init__()
-
-
-@dataclass(eq=False, repr=False)
-class UnloadResult(betterproto.Message):
-    result: "Result" = betterproto.message_field(1)
+class OpenResult(betterproto.Message):
+    action: "OpenResultAction" = betterproto.enum_field(1)
+    ok: bool = betterproto.bool_field(2)
+    err: str = betterproto.string_field(3)
+    frame_count: int = betterproto.uint32_field(4, group="data")
 
     def __post_init__(self) -> None:
         super().__post_init__()
 
 
 class PlayerServiceStub(betterproto.ServiceStub):
-    async def show_screen(self, *, screen_path: str = "") -> "ShowScreenResult":
-
-        request = ShowScreen()
-        request.screen_path = screen_path
-
-        return await self._unary_unary(
-            "/vslomp.PlayerService/ShowScreen", request, ShowScreenResult
-        )
-
-    async def load_video(
-        self, *, video_path: str = "", vstream_idx: int = 0, frame_wait: float = 0.0
-    ) -> "LoadVideoResult":
-
-        request = LoadVideo()
-        request.video_path = video_path
-        request.vstream_idx = vstream_idx
-        request.frame_wait = frame_wait
-
-        return await self._unary_unary("/vslomp.PlayerService/LoadVideo", request, LoadVideoResult)
-
-    async def play(
+    async def open(
         self,
         *,
+        screen_path: Optional[str] = None,
+        video_path: str = "",
+        vstream_idx: Optional[int] = None,
+        frame_wait: float = 0.0,
         start: Optional[int] = None,
         stop: Optional[int] = None,
         step: Optional[int] = None,
-    ) -> AsyncIterator["PlayResult"]:
+    ) -> AsyncIterator["OpenResult"]:
 
-        request = Play()
+        request = Open()
+        if screen_path is not None:
+            request.screen_path = screen_path
+        request.video_path = video_path
+        if vstream_idx is not None:
+            request.vstream_idx = vstream_idx
+        request.frame_wait = frame_wait
         if start is not None:
             request.start = start
         if stop is not None:
@@ -126,14 +68,8 @@ class PlayerServiceStub(betterproto.ServiceStub):
             request.step = step
 
         async for response in self._unary_stream(
-            "/vslomp.PlayerService/Play",
+            "/vslomp.PlayerService/Open",
             request,
-            PlayResult,
+            OpenResult,
         ):
             yield response
-
-    async def unload(self) -> "UnloadResult":
-
-        request = Unload()
-
-        return await self._unary_unary("/vslomp.PlayerService/Unload", request, UnloadResult)

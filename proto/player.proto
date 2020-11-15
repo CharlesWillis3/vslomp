@@ -5,51 +5,32 @@ package vslomp;
 import "google/protobuf/wrappers.proto";
 
 service PlayerService {
-  rpc ShowScreen(vslomp.ShowScreen) returns (vslomp.ShowScreenResult);
-  rpc LoadVideo(vslomp.LoadVideo) returns (vslomp.LoadVideoResult);
-  rpc Play(vslomp.Play) returns (stream vslomp.PlayResult);
-  rpc Unload(vslomp.Unload) returns (vslomp.UnloadResult);
+  rpc Open(vslomp.Open) returns (stream vslomp.OpenResult);
 }
 
-message Result {
-  bool ok = 1;
-  string err = 2;
+message Open {
+  google.protobuf.StringValue screen_path = 1;
+  string video_path = 2;
+  google.protobuf.UInt32Value vstream_idx = 3;
+  float frame_wait = 4;
+  google.protobuf.Int32Value start = 5;
+  google.protobuf.Int32Value stop = 6;
+  google.protobuf.Int32Value step = 7;
 }
 
-message ShowScreen {
-  string screen_path = 1;
-}
+message OpenResult {
+  enum Action {
+    UNKNOWN = 0;
+    SPLASH_SCREEN = 1;
+    LOAD_VIDEO = 2;
+    PLAY_VIDEO = 3;
+  }
 
-message ShowScreenResult {
-  Result result = 1;
-}
+  Action action = 1;
+  bool ok = 2;
+  string err = 3;
 
-message LoadVideo {
-  string video_path = 1;
-  uint32 vstream_idx = 2;
-  float frame_wait = 3;
-}
-
-message LoadVideoResult {
-  Result result = 1;
-  uint32 frame_count = 2;
-}
-
-message Play {
-  google.protobuf.Int32Value start = 1;
-  google.protobuf.Int32Value stop = 2;
-  google.protobuf.Int32Value step = 3;
-}
-
-message PlayResult {
-  Result result = 1;
-  uint32 frame_idx = 2;
-  bool done = 3;
-}
-
-message Unload {
-}
-
-message UnloadResult {
-  Result result = 1;
+  oneof data {
+    uint32 frame_count = 4;
+  }
 }

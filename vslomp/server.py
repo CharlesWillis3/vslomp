@@ -1,8 +1,5 @@
 import asyncio
-from asyncio.tasks import wait_for
-from os import wait
-from queue import Queue
-from typing import Any, AsyncIterator, Container, Optional, Tuple, Union
+from typing import Any, AsyncIterator, Awaitable, Tuple, Union
 
 import protoflux.servicer as flux
 from PIL import Image
@@ -11,126 +8,101 @@ from qcmd.core import CommandHandle
 import vslomp.display.proc as disp
 import vslomp.gen.vslomp as gen
 import vslomp.video.proc as vid
+from vslomp.video.proc import LoadResult
 
 
 @flux.grpc_service("vslomp.PlayerService")
 class PlayerService:
-    curr_vid: Optional[vid.LoadResult] = None
-
     def __init__(self, disp: disp.DisplayProcessor, vid: vid.VideoProcessor) -> None:
         self.dp = disp
         self.vp = vid
 
     @flux.grpc_method
-    async def show_screen(self, req: gen.ShowScreen) -> gen.ShowScreenResult:
+    async def open(self, req: gen.Open) -> AsyncIterator[gen.OpenResult]:
+        loop = asyncio.get_running_loop()
 
-        h = self.dp.send(disp.Cmd.Splashscreen((req.screen_path)), pri=46)
+        if req.screen_path:
+            ok, res = await wait_for_cmd(self.dp.send(disp.Cmd.Splashscreen(req.screen_path)))
 
-        ok, err = await wait_for_cmd(h)
+            yield gen.OpenResult(action=gen.OpenResultAction.SPLASH_SCREEN, ok=ok, err=str(res))
 
-        return gen.ShowScreenResult(gen.Result(ok=ok, err=err))
-
-    @flux.grpc_method
-    async def load_video(self, req: gen.LoadVideo) -> gen.LoadVideoResult:
-        event = asyncio.Event()
-        frames = 0
-        err = None
-
-        def _generate(res: vid.LoadResult, _: Any):
-            nonlocal frames
-            frames = res.frames
-            self.curr_vid = res
-            event.set()
-
-        def _error(ex: Exception, _: Any):
-            nonlocal err
-            err = str(ex)
-            event.set()
-
-        h = self.dp.send(disp.Cmd.InitVideo(wait=req.frame_wait))
-        ok, err = await wait_for_cmd(h)
-
-        if not ok:
-            return gen.LoadVideoResult(result=gen.Result(ok=ok, err=err))
-
-        self.vp.send(
-            vid.Cmd.Load(
-                req.video_path,
-                vstream_idx=req.vstream_idx,
-                skip_frame="NONKEY",
+        ok, res = await wait_for_cmd(
+            self.vp.send(
+                vid.Cmd.Load(req.video_path, req.vstream_idx if req.vstream_idx else 0, "NONKEY")
             )
-        ).then(_generate).or_err(_error)
+        )
 
-        await event.wait()
-
-        if err is None:
-            return gen.LoadVideoResult(frame_count=frames, result=gen.Result(ok=True))
+        if ok and isinstance(res, LoadResult):
+            load_result = res
+            yield gen.OpenResult(
+                action=gen.OpenResultAction.LOAD_VIDEO, ok=True, frame_count=load_result.frames
+            )
         else:
-            return gen.LoadVideoResult(result=gen.Result(ok=False, err=err))
-
-    @flux.grpc_method
-    async def play(self, req: gen.Play) -> AsyncIterator[gen.PlayResult]:
-        if self.curr_vid is None:
-            yield gen.PlayResult(done=True, result=gen.Result(ok=False, err="Video Not Loaded"))
+            yield gen.OpenResult(action=gen.OpenResultAction.LOAD_VIDEO, ok=False, err=str(res))
             return
 
-        generator = _FrameIterator(self.curr_vid.frames)
+        ok, res = await wait_for_cmd(self.dp.send(disp.Cmd.InitVideo(req.frame_wait)))
 
-        def _onimage(img: Image.Image, frame: int, tags: Container[Any]):
-            generator.push(frame)
-            self.dp.send(disp.Cmd.Display(img, frame), tags=[("frame", frame)])
+        if not ok:
+            yield gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=False, err=str(res))
+            return
 
-        def _result(_: Any, __: Any):
-            self.vp.send(vid.Cmd.Unload())
-            self.vp.join()
+        iter = _FrameIterator(load_result.frames)
 
-        def _error(ex: Exception, _: Any):
-            generator.push(str(ex))
+        def _onimage(img: Image.Image, fr: int, tags: Any):
+            def __push(val: Union[int, str]):
+                loop.call_soon_threadsafe(lambda: iter.push(val))
 
-        self.vp.send(
-            vid.Cmd.GenerateImages(
-                self.curr_vid, _onimage, start=req.start, stop=req.stop, step=req.step
+            self.dp.send(disp.Cmd.Display(img, fr), tags=tags).then(
+                lambda r, t: __push(fr)
+            ).or_err(lambda ex, t: __push(str(ex)))
+
+        gen_task = wait_for_cmd(
+            self.vp.send(
+                vid.Cmd.GenerateImages(
+                    load_result, _onimage, start=req.start, stop=req.stop, step=req.step
+                )
             )
-        ).then(_result).or_err(_error)
+        )
 
-        async for m in generator:
-            yield m
+        self.dp.send(disp.Cmd.FINISH, pri=100)
 
-    @flux.grpc_method
-    async def unload(self, req: gen.Unload) -> gen.UnloadResult:
-        ...
+        async for res in iter:
+            yield res
+
+        # await gen_task
+
+        self.vp.join()
+        self.dp.join()
+
+        yield gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=True)
 
 
-async def wait_for_cmd(h: CommandHandle[Any, Any]) -> Tuple[bool, str]:
-    event = asyncio.Event()
-    err = None
+def wait_for_cmd(h: CommandHandle[Any, Any]) -> Awaitable[Tuple[bool, Union[Exception, Any]]]:
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
 
     def _result(r: Any, t: disp.disp_utils.Tags):
-        event.set()
+        loop.call_soon_threadsafe(lambda: future.set_result((True, r)))
 
     def _error(ex: Exception, t: disp.disp_utils.Tags):
-        nonlocal err
-        err = str(ex)
-        event.set()
+        loop.call_soon_threadsafe(lambda: future.set_result((False, ex)))
 
     h.then(_result).or_err(_error)
 
-    await event.wait()
-
-    return (err is not None, err or "")
+    return future
 
 
-class _FrameIterator(AsyncIterator[gen.PlayResult]):
-    _q: "asyncio.Queue[Union[int, str]]" = asyncio.Queue()
-
+class _FrameIterator(AsyncIterator[gen.OpenResult]):
     def __init__(self, frame_count: int):
-        self.frame_count = frame_count
+        self._frame_count = frame_count
         self._stop = False
+        self._q: "asyncio.Queue[Union[int, str]]" = asyncio.Queue()
 
-    def __aiter__(self) -> AsyncIterator[gen.PlayResult]:
+    def __aiter__(self) -> AsyncIterator[gen.OpenResult]:
         return self
 
-    async def __anext__(self) -> gen.PlayResult:
+    async def __anext__(self) -> gen.OpenResult:
         if self._stop:
             raise StopAsyncIteration
 
@@ -138,12 +110,12 @@ class _FrameIterator(AsyncIterator[gen.PlayResult]):
 
         if isinstance(curr, str):
             self._stop = True
-            return gen.PlayResult(result=gen.Result(ok=False, err=curr))
+            return gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=False, err=curr)
 
-        if curr == self.frame_count - 1:
+        if curr >= self._frame_count - 1:
             self._stop = True
 
-        return gen.PlayResult(frame_idx=curr, done=self._stop, result=gen.Result(ok=True))
+        return gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=True, frame_count=curr)
 
     def push(self, frame: Union[int, str]):
         self._q.put_nowait(frame)

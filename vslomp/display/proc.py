@@ -2,8 +2,9 @@ import concurrent.futures as conc
 import contextlib
 import dataclasses
 import enum
+from asyncio.unix_events import FastChildWatcher
 from pathlib import Path
-from queue import Queue
+from queue import Empty, Queue
 from threading import Timer
 from typing import Any, BinaryIO, ClassVar, NamedTuple, Optional, Tuple, Union
 
@@ -83,13 +84,16 @@ class Cmd:
         wait: Optional[float] = None
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
+            global _buffer, last_timer
+
             def _pushnext(res: None, tags: Any):
                 _wait = self.wait if self.wait else 0.0
                 if Cmd.InitVideo.firstFrame:
                     _wait = 0.0
                     Cmd.InitVideo.firstFrame = False
                 timer = Timer(_wait, _display)
-                timer.setName("PushNextFrame")
+                last_timer = timer
+                timer.setName(f"PushNextFrame[{_wait}]")
                 timer.start()
 
             def _display():
@@ -145,8 +149,10 @@ class Cmd:
         frame: Optional[int]
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
+            global _buffer
+
             def _bufferput(img: Image.Image, tags: disp_utils.Tags):
-                _buffer.put((img, tags), block=True)
+                _buffer.put_nowait((img, tags))
 
             def _convert(img: Image.Image, tags: disp_utils.Tags):
                 cxt.imager.send(
@@ -162,8 +168,14 @@ class Cmd:
         cmdid = CommandId.FINISH
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
+            global _buffer
+            global last_timer
+
+            _last_timer = last_timer
+            if _last_timer:
+                _last_timer.cancel()
+
             cxt.imager.join()
-            cxt.imager.halt()
             _buffer.join()
 
     FINISH = Finish()
@@ -172,15 +184,10 @@ class Cmd:
         cmdid = CommandId.SLEEP
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
-            global last_timer
             cxt.screen.join()
             cxt.screen.send(screen.Cmd.Clear(), 100)
             cxt.screen.send(screen.Cmd.Sleep(), 101)
             cxt.screen.send(screen.Cmd.Uninit(), 102)
             cxt.screen.join()
-
-            _last_timer = last_timer
-            if _last_timer:
-                _last_timer.cancel()
 
     SLEEP = Sleep()

@@ -8,7 +8,15 @@
             "name": "VSLOMP Module",
             "type": "python",
             "request": "launch",
-            "module": "vslomp"
+            "module": "vslomp",
+            "args": ["epd7in5_V2", "-t 8"]
+        },
+        {
+            "name": "VSLO Client",
+            "type": "python",
+            "request": "launch",
+            "module": "vsloclient",
+            "args": ["/home/pi/.vslomp/vslomp.sock"]
         }
     ]
 }
