@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package vslomp;
+
+import "google/protobuf/wrappers.proto";
+
+service PlayerService {
+  rpc Open(vslomp.Open) returns (stream vslomp.OpenResult);
+}
+
+message Open {
+  google.protobuf.StringValue screen_path = 1;
+  string video_path = 2;
+  google.protobuf.UInt32Value vstream_idx = 3;
+  float frame_wait = 4;
+  google.protobuf.Int32Value start = 5;
+  google.protobuf.Int32Value stop = 6;
+  google.protobuf.Int32Value step = 7;
+}
+
+message OpenResult {
+  enum Action {
+    UNKNOWN = 0;
+    SPLASH_SCREEN = 1;
+    LOAD_VIDEO = 2;
+    PLAY_VIDEO = 3;
+  }
+
+  Action action = 1;
+  bool ok = 2;
+  string err = 3;
+
+  oneof data {
+    uint32 frame_count = 4;
+  }
+}
