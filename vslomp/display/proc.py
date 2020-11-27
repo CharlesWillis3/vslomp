@@ -2,11 +2,11 @@ import concurrent.futures as conc
 import contextlib
 import dataclasses
 import enum
-from asyncio.unix_events import FastChildWatcher
+import functools
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Queue
 from threading import Timer
-from typing import Any, BinaryIO, ClassVar, NamedTuple, Optional, Tuple, Union
+from typing import Any, BinaryIO, Callable, ClassVar, NamedTuple, Optional, Tuple, Union
 
 import PIL.Image as Image
 import qcmd.core as qcore
@@ -62,7 +62,7 @@ def create(screen_name: str, executor: conc.Executor):
     logevent("EXIT", "DisplayProcessorContextManager")
 
 
-_buffer: "Queue[Tuple[Image.Image, disp_utils.Tags]]" = Queue()
+_buffer: "Queue[Tuple[Image.Image, Optional[int], disp_utils.Tags]]" = Queue()
 last_timer: Optional[Timer] = None
 
 
@@ -81,29 +81,34 @@ class Cmd:
         cmdid = CommandId.INIT_VIDEO
         firstFrame: ClassVar[bool] = True
 
+        ondisplay: Callable[[int], None]
         wait: Optional[float] = None
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
             global _buffer, last_timer
 
-            def _pushnext(res: None, tags: Any):
+            def _pushnext(res: None, tags: Any, *, frame: Optional[int]):
                 _wait = self.wait if self.wait else 0.0
                 if Cmd.InitVideo.firstFrame:
                     _wait = 0.0
                     Cmd.InitVideo.firstFrame = False
-                timer = Timer(_wait, _display)
-                last_timer = timer
-                timer.setName(f"PushNextFrame[{_wait}]")
-                timer.start()
+                last_timer = Timer(_wait, _display)
+                last_timer.setName(f"PushNextFrame[{_wait}]")
+                last_timer.start()
+
+                if frame:
+                    self.ondisplay(frame)
 
             def _display():
-                img, tags = _buffer.get(block=True)
-                cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(_pushnext)
+                img, frno, tags = _buffer.get(block=True)
+                cxt.screen.send(screen.Cmd.Display(img), tags=tags).then(
+                    functools.partial(_pushnext, frame=frno)
+                )
                 _buffer.task_done()
 
             _buffer = Queue()
             # sends frames one-by-one to the screen processor so we have a chance to interrupt
-            _pushnext(None, None)
+            _pushnext(None, None, frame=None)
 
     class Clear(_DisplayCommand):
         cmdid = CommandId.CLEAR
@@ -152,7 +157,7 @@ class Cmd:
             global _buffer
 
             def _bufferput(img: Image.Image, tags: disp_utils.Tags):
-                _buffer.put_nowait((img, tags))
+                _buffer.put((img, self.frame, tags), block=True)
 
             def _convert(img: Image.Image, tags: disp_utils.Tags):
                 cxt.imager.send(
@@ -168,8 +173,7 @@ class Cmd:
         cmdid = CommandId.FINISH
 
         def exec(self, hcmd: DisplayCommandHandle, cxt: Context) -> Result:
-            global _buffer
-            global last_timer
+            global _buffer, last_timer
 
             _last_timer = last_timer
             if _last_timer:
@@ -177,6 +181,7 @@ class Cmd:
 
             cxt.imager.join()
             _buffer.join()
+            cxt.screen.join()
 
     FINISH = Finish()
 

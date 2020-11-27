@@ -80,13 +80,14 @@ class Cmd:
         stop: Optional[int] = None
         step: Optional[int] = None
 
-        def exec(self, hcmd: VideoCommandHandle, cxt: None) -> Result:
+        def exec(self, hcmd: VideoCommandHandle, cxt: None) -> int:
             _start = self.start if self.start else 0
             _step = self.step if self.step else 1
 
             def _calcframe(x: int):
                 return _start + (_step * x)
 
+            x = 0
             for x, vframe in enumerate(
                 itertools.islice(
                     self.loadresult.container.decode(self.loadresult.stream),
@@ -96,6 +97,8 @@ class Cmd:
                 )
             ):
                 self.onimage(vframe.to_image(), _calcframe(x), hcmd.tags)
+
+            return x
 
     class Unload(_VideoCommand):
         cmdid = CommandId.UNLOAD

@@ -40,3 +40,4 @@ allow_prereleases = true
 pyright = "node node_modules/pyright"
 protoc = "protoc -I ./proto --python_betterproto_out=vslomp/gen"
 vslomp = "python -m vslomp"
+vsloclient = "python -m vsloclient"

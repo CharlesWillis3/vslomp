@@ -1,6 +1,5 @@
 {
     "python.languageServer": "Pylance",
-    "python.pythonPath": "/home/pi/.local/share/virtualenvs/vslomp-4Mm0UnRM/bin/python",
     "python.formatting.provider": "black",
     "python.terminal.activateEnvironment": false,
 }

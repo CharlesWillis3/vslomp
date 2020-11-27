@@ -6,9 +6,9 @@ from vslomp.gen.vslomp import PlayerServiceStub
 
 screen_path = "/home/pi/images/001.jpg"
 video_path = "/home/pi/video/BATMAN_V_SUPERMAN_DAWN_OF_JUSTICE_TRAILER_6A_480.mov"
-frame_wait = 1.25
-start = 80
-step = 10
+frame_wait = 3600
+start = 10
+step = 5
 
 
 async def main(*, host: str, port: int):

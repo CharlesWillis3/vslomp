@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, AsyncIterator, Awaitable, Tuple, Union
+from typing import Any, AsyncIterator, Awaitable, Optional, Tuple, Union
 
 import protoflux.servicer as flux
 from PIL import Image
@@ -17,7 +17,7 @@ class PlayerService:
         self.dp = disp
         self.vp = vid
 
-    @flux.grpc_method
+    @flux.grpc_method  # type:ignore
     async def open(self, req: gen.Open) -> AsyncIterator[gen.OpenResult]:
         loop = asyncio.get_running_loop()
 
@@ -41,41 +41,39 @@ class PlayerService:
             yield gen.OpenResult(action=gen.OpenResultAction.LOAD_VIDEO, ok=False, err=str(res))
             return
 
-        ok, res = await wait_for_cmd(self.dp.send(disp.Cmd.InitVideo(req.frame_wait)))
+        frame_iter = _FrameIterator(load_result.frames)
+
+        def __push(val: Union[int, str]):
+            loop.call_soon_threadsafe(lambda: frame_iter.push(val))
+
+        ok, res = await wait_for_cmd(
+            self.dp.send(disp.Cmd.InitVideo(lambda fr: __push(fr), req.frame_wait))
+        )
 
         if not ok:
             yield gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=False, err=str(res))
             return
 
-        iter = _FrameIterator(load_result.frames)
-
         def _onimage(img: Image.Image, fr: int, tags: Any):
-            def __push(val: Union[int, str]):
-                loop.call_soon_threadsafe(lambda: iter.push(val))
-
-            self.dp.send(disp.Cmd.Display(img, fr), tags=tags).then(
-                lambda r, t: __push(fr)
-            ).or_err(lambda ex, t: __push(str(ex)))
-
-        gen_task = wait_for_cmd(
-            self.vp.send(
-                vid.Cmd.GenerateImages(
-                    load_result, _onimage, start=req.start, stop=req.stop, step=req.step
-                )
+            self.dp.send(disp.Cmd.Display(img, fr), tags=tags).or_err(
+                lambda ex, t: __push(str(ex))
             )
-        )
+
+        self.vp.send(
+            vid.Cmd.GenerateImages(
+                load_result, _onimage, start=req.start, stop=req.stop, step=req.step
+            )
+        ).then(lambda steps, tags: frame_iter.total_steps(steps))
 
         self.dp.send(disp.Cmd.FINISH, pri=100)
 
-        async for res in iter:
+        async for res in frame_iter:
             yield res
-
-        # await gen_task
 
         self.vp.join()
         self.dp.join()
 
-        yield gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=True)
+        yield gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=True, err="***")
 
 
 def wait_for_cmd(h: CommandHandle[Any, Any]) -> Awaitable[Tuple[bool, Union[Exception, Any]]]:
@@ -98,6 +96,8 @@ class _FrameIterator(AsyncIterator[gen.OpenResult]):
         self._frame_count = frame_count
         self._stop = False
         self._q: "asyncio.Queue[Union[int, str]]" = asyncio.Queue()
+        self._num_steps = 0
+        self._total_steps: Optional[int] = None
 
     def __aiter__(self) -> AsyncIterator[gen.OpenResult]:
         return self
@@ -115,7 +115,14 @@ class _FrameIterator(AsyncIterator[gen.OpenResult]):
         if curr >= self._frame_count - 1:
             self._stop = True
 
+        if self._total_steps and self._num_steps == self._total_steps:
+            self._stop = True
+
+        self._num_steps += 1
         return gen.OpenResult(action=gen.OpenResultAction.PLAY_VIDEO, ok=True, frame_count=curr)
+
+    def total_steps(self, steps: int):
+        self._total_steps = steps
 
     def push(self, frame: Union[int, str]):
         self._q.put_nowait(frame)
